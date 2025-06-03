@@ -2,43 +2,48 @@ from flask import Flask, request, jsonify
 from seo_fetcher import fetch_seo_data
 from ai_generator import generate_blog_post
 from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
 import atexit
 import datetime
+import os
+
+#when i use api key
+load_dotenv()
 
 app = Flask(__name__)
 
-#generate url
 @app.route('/generate', methods=['GET'])
 def generate():
     keyword = request.args.get('keyword', 'wireless earbuds')
     seo_data = fetch_seo_data(keyword)
-    content = generate_blog_post(keyword, seo_data)
+    blog_content = generate_blog_post(keyword, seo_data)
+
     return jsonify({
         "keyword": keyword,
         "seo": seo_data,
-        "blog_html": content
+        "blog": blog_content
     })
 
-#scheduled job to run daily
-def scheduled_blog_generation():
+def blog_generator():
     keyword = "wireless earbuds"
     seo_data = fetch_seo_data(keyword)
-    content = generate_blog_post(keyword, seo_data)
+    blog_content = generate_blog_post(keyword, seo_data)
 
-    #saving to file
-    now = datetime.datetime.now().strftime("%Y-%m-%d")
-    filename = f"blog_{keyword.replace(' ', '_')}_{now}.md"
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
+    filename = f"blog_{keyword.replace(' ', '_')}_{timestamp}.md"
+
     with open(filename, "w", encoding="utf-8") as f:
-        f.write(content)
-    print(f"[{now}] Generated blog for: {keyword} saved as {filename}")
+        f.write(blog_content)
 
-#starting the scheduler
+    print(f"[{timestamp}] Blog post generated and saved as {filename}")
+
+#runs the job once per day
 scheduler = BackgroundScheduler()
-scheduler.add_job(scheduled_blog_generation, 'interval', days=1)
+scheduler.add_job(blog_generator, 'interval', days=1)
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
 if __name__ == "__main__":
     #runs the schedule for testing
-    scheduled_blog_generation()
+    blog_generator()
     app.run(debug=True)
